@@ -31,6 +31,7 @@ var (
 func main() {
 	flag.StringVar(&namespace, "namespace", defaultNamespace, "The configuration namespace")
 	flag.StringVar(&kubeConfig, "kubeconfig", "", "Absolute path to the kubeconfig")
+	flag.StringVar(&cfg.BuildTemplate, "build-template", "", "Knative build template")
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
@@ -65,5 +66,5 @@ func startServer() {
 	router.HandleFunc("/users", restcall.CreateUser).Methods("POST")
 	router.HandleFunc("/functions", restcall.CreateFunction).Methods("POST")
 
-	glog.Fatal(http.ListenAndServe(":8080", router))
+	glog.Fatal(http.ListenAndServe(":8888", router))
 }

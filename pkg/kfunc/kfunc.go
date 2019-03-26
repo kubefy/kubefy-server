@@ -16,15 +16,25 @@ package kfunc
 import (
 	"fmt"
 
+	cfg "github.com/kubefy/kubefy-server/pkg/config"
+
 	build_api "github.com/knative/build/pkg/apis/build/v1alpha1"
 	serving_api "github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Deploy(url, funcName string) error {
-	if len(url) == 0 || len(funcName) == 0 {
-		return fmt.Errorf("git repo or function name is missing")
+func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) error {
+	if len(gitUrl) == 0 || len(funcName) == 0 || len(containerUser) == 0 {
+		return fmt.Errorf("git repo, container registry user name, or function name is missing")
 	}
+
+	if len(gitRevision) == 0 {
+		gitRevision = "master"
+	}
+	if len(containerUrl) == 0 {
+		containerUrl = "docker.io"
+	}
+
 	svc := &serving_api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: funcName,
@@ -36,16 +46,16 @@ func Deploy(url, funcName string) error {
 						BuildSpec: &build_api.BuildSpec{
 							Source: &build_api.SourceSpec{
 								Git: &build_api.GitSourceSpec{
-									Url:      url,
-									Revision: "master",
+									Url:      gitUrl,
+									Revision: gitRevision,
 								},
 							},
 							Template: &build_api.TemplateInstantiationSpec{
-								Name: KubeCfg.BuildTemplate,
+								Name: cfg.BuildTemplate,
 								Arguments: []build_api.ArgumentSpec{
 									build_api.ArgumentSpec{
 										Name:  "IMAGE",
-										Value: KubeCfg.ContainerRegistryUrl + "/" + KubeCfg.ContainerRegistryUserName + "/" + funcName,
+										Value: containerUrl + "/" + funcName,
 									},
 								},
 							},
@@ -55,7 +65,7 @@ func Deploy(url, funcName string) error {
 			},
 		},
 	}
-	_, err := ServingClientset.ServingV1alpha1().Services("defaults").Create(svc)
+	_, err := cfg.ServingClientset.ServingV1alpha1().Services("defaults").Create(svc)
 
 	return err
 }
