@@ -20,6 +20,7 @@ import (
 
 	build_api "github.com/knative/build/pkg/apis/build/v1alpha1"
 	serving_api "github.com/knative/serving/pkg/apis/serving/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,7 +35,7 @@ func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) e
 	if len(containerUrl) == 0 {
 		containerUrl = "docker.io"
 	}
-
+	imageUrl := containerUrl + "/" + containerUser + "/" + funcName
 	svc := &serving_api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: funcName,
@@ -43,21 +44,34 @@ func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) e
 			RunLatest: &serving_api.RunLatestType{
 				Configuration: serving_api.ConfigurationSpec{
 					Build: &serving_api.RawExtension{
-						BuildSpec: &build_api.BuildSpec{
-							Source: &build_api.SourceSpec{
-								Git: &build_api.GitSourceSpec{
-									Url:      gitUrl,
-									Revision: gitRevision,
-								},
+						Object: &build_api.Build{
+							TypeMeta: metav1.TypeMeta{
+								APIVersion: build_api.SchemeGroupVersion.String(),
+								Kind:       "Build",
 							},
-							Template: &build_api.TemplateInstantiationSpec{
-								Name: cfg.BuildTemplate,
-								Arguments: []build_api.ArgumentSpec{
-									build_api.ArgumentSpec{
-										Name:  "IMAGE",
-										Value: containerUrl + "/" + funcName,
+							Spec: build_api.BuildSpec{
+								Source: &build_api.SourceSpec{
+									Git: &build_api.GitSourceSpec{
+										Url:      gitUrl,
+										Revision: gitRevision,
 									},
 								},
+								Template: &build_api.TemplateInstantiationSpec{
+									Name: cfg.BuildTemplate,
+									Arguments: []build_api.ArgumentSpec{
+										build_api.ArgumentSpec{
+											Name:  "IMAGE",
+											Value: imageUrl,
+										},
+									},
+								},
+							},
+						},
+					},
+					RevisionTemplate: serving_api.RevisionTemplateSpec{
+						Spec: serving_api.RevisionSpec{
+							Container: corev1.Container{
+								Image: imageUrl,
 							},
 						},
 					},
@@ -65,6 +79,7 @@ func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) e
 			},
 		},
 	}
+
 	_, err := cfg.ServingClientset.ServingV1alpha1().Services("defaults").Create(svc)
 
 	return err
