@@ -14,11 +14,22 @@
 
 .PHONY: all kubefy
 
+IMAGE_NAME=docker.io/rootfs/kubefy
+IMAGE_VERSION=latest
+
 all: kubefy
 
 kubefy:
 	if [ ! -d ./vendor ]; then dep ensure -vendor-only; fi
 	CGO_ENABLED=0 GOOS=linux go build -i -a -ldflags '-extldflags "-static"' -o  _output/kubefy app/kubefy.go
+
+image: kubefy
+	cp _output/kubefy  deploy/kubefy
+	docker build -t $(IMAGE_NAME):$(IMAGE_VERSION) deploy
+
+push-image: image
+	docker push $(IMAGE_NAME):$(IMAGE_VERSION)
+
 
 clean:
 	rm -rf _output
