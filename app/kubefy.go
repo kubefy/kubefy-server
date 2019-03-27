@@ -65,6 +65,8 @@ func startServer() {
 	router.HandleFunc("/", restcall.Root).Methods("GET")
 	router.HandleFunc("/users", restcall.CreateUser).Methods("POST")
 	router.HandleFunc("/functions", restcall.CreateFunction).Methods("POST")
+	router.HandleFunc("/functions", restcall.GetFunction).Methods("GET")
+	router.HandleFunc("/functions", restcall.DeleteFunction).Methods("DELETE")
 
 	glog.Fatal(http.ListenAndServe(":8888", router))
 }

@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	cfg "github.com/kubefy/kubefy-server/pkg/config"
+	"github.com/kubefy/kubefy-server/pkg/model"
 
 	build_api "github.com/knative/build/pkg/apis/build/v1alpha1"
 	serving_api "github.com/knative/serving/pkg/apis/serving/v1alpha1"
@@ -24,7 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) error {
+const (
+	defaultContainerRegistry = "docker.io"
+	defaultIstioNamespace    = "istio-system"
+	defaultIstioGatewaySvc   = "istio-ingressgateway"
+	defaultBuildTemplate     = "buildah"
+)
+
+func Deploy(namespace, gitUrl, gitRevision, containerUrl, containerUser, funcName string) error {
 	if len(gitUrl) == 0 || len(funcName) == 0 || len(containerUser) == 0 {
 		return fmt.Errorf("git repo, container registry user name, or function name is missing")
 	}
@@ -33,12 +41,17 @@ func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) e
 		gitRevision = "master"
 	}
 	if len(containerUrl) == 0 {
-		containerUrl = "docker.io"
+		containerUrl = defaultContainerRegistry
+	}
+	buildTemplate := defaultBuildTemplate
+	if len(cfg.BuildTemplate) != 0 {
+		buildTemplate = cfg.BuildTemplate
 	}
 	imageUrl := containerUrl + "/" + containerUser + "/" + funcName
 	svc := &serving_api.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: funcName,
+			Name:      funcName,
+			Namespace: namespace,
 		},
 		Spec: serving_api.ServiceSpec{
 			RunLatest: &serving_api.RunLatestType{
@@ -57,7 +70,7 @@ func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) e
 									},
 								},
 								Template: &build_api.TemplateInstantiationSpec{
-									Name: cfg.BuildTemplate,
+									Name: buildTemplate,
 									Arguments: []build_api.ArgumentSpec{
 										build_api.ArgumentSpec{
 											Name:  "IMAGE",
@@ -85,9 +98,14 @@ func Deploy(gitUrl, gitRevision, containerUrl, containerUser, funcName string) e
 	return err
 }
 
-func View(funcName string) (string, error) {
+func View(namespace, funcName string) ([]model.Endpoint, error) {
+	var (
+		endpoints []model.Endpoint
+	)
+
 	if len(funcName) == 0 {
-		return "", fmt.Errorf("function name is missing")
+		return endpoints, fmt.Errorf("function name is missing")
 	}
-	return "succeed", nil
+	// get istio ingress endpoint
+	return endpoints, nil
 }

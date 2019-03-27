@@ -10,38 +10,34 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/kubefy/kubefy-server/pkg/kfunc"
+	"github.com/kubefy/kubefy-server/pkg/model"
 )
 
-type CreateUserRequest struct {
-	Name   string `json:"name"`
-	Bucket string `json:"bucket,omitempty"`
-	// docker setting
-	DockerId       string `json:"dockerId"`
-	DockerPassword string `json:"dockerPassword,omitempty"`
-	// github setting
-	GithubId       string `json:"githubId,omitempty"`
-	GithubPassword string `json:"githubPassword,omitempty"`
+func getRequest(w http.ResponseWriter, r *http.Request, req interface{}) error {
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+	if err != nil {
+		panic(err)
+	}
+	if err := r.Body.Close(); err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal(body, req); err != nil {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		glog.Warningf("failed to parse: %v", err)
+		w.WriteHeader(422)
+		if err := json.NewEncoder(w).Encode(err); err != nil {
+			panic(err)
+		}
+	}
+	return nil
 }
 
-type CreateUserResponse struct {
-	Name        string `json:"name"`
-	Bucket      string `json:"bucket,omitempty"`
-	S3Endpoint  string `json:"s3endpoint,omitempty"`
-	S3AccessKey string `json:"s3access,omitempty"`
-	S3SecretKey string `json:"s3secret,omitempty"`
-}
-
-type CreateFunctionRequest struct {
-	CreateUserRequest
-	FunctionName   string `json:"functionName"`
-	GitRepo        string `json:"repo"`
-	RepoRevision   string `json:"revision,omitempty"`
-	ContainerImage string `json:"image,omitempty"`
-}
-
-type CreateFunctionResponse struct {
-	Endpoint  string `json:"endpoint"`
-	Authority string `json:"authoriy"`
+func sendResponse(w http.ResponseWriter, rep interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(rep); err != nil {
+		panic(err)
+	}
 }
 
 func Root(w http.ResponseWriter, r *http.Request) {
@@ -50,62 +46,33 @@ func Root(w http.ResponseWriter, r *http.Request) {
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	var (
-		req CreateUserRequest
-		rep CreateUserResponse
+		req model.CreateUserRequest
+		rep model.CreateUserResponse
 	)
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-	if err != nil {
-		panic(err)
+	if err := getRequest(w, r, &req); err != nil {
+		return
 	}
-	if err := r.Body.Close(); err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		glog.Warningf("failed to parse")
-		w.WriteHeader(422)
-		if err := json.NewEncoder(w).Encode(err); err != nil {
-			panic(err)
-		}
-	}
+
 	// handle user here
 
 	// response
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(rep); err != nil {
-		panic(err)
-	}
+	sendResponse(w, rep)
 }
 
 func CreateFunction(w http.ResponseWriter, r *http.Request) {
 	var (
-		req CreateFunctionRequest
-		rep CreateFunctionResponse
+		req model.CreateFunctionRequest
+		rep model.CreateFunctionResponse
 	)
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-	if err != nil {
-		panic(err)
-	}
-	if err := r.Body.Close(); err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		glog.Warningf("failed to parse: %v", err)
-		w.WriteHeader(422)
-		if err := json.NewEncoder(w).Encode(err); err != nil {
-			panic(err)
-		}
+	if err := getRequest(w, r, &req); err != nil {
 		return
 	}
-	// handle function here
 	gitUrl := req.GitRepo
 	gitRevision := req.RepoRevision
 	funcName := req.FunctionName
 	dockerId := req.DockerId
-	// response
-	if err := kfunc.Deploy(gitUrl, gitRevision, "docker.io", dockerId, funcName); err != nil {
+	namespace := req.UserName
+	if err := kfunc.Deploy(namespace, gitUrl, gitRevision, "docker.io", dockerId, funcName); err != nil {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		glog.Warningf("failed to create functions: %v", err)
 		w.WriteHeader(500)
@@ -114,9 +81,33 @@ func CreateFunction(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(rep); err != nil {
-		panic(err)
+	sendResponse(w, rep)
+}
+
+func GetFunction(w http.ResponseWriter, r *http.Request) {
+	var (
+		req model.GetFunctionRequest
+		rep model.GetFunctionResponse
+	)
+	if err := getRequest(w, r, &req); err != nil {
+		return
 	}
+	funcName := req.FunctionName
+	namespace := req.UserName
+	if ep, err := kfunc.View(namespace, funcName); err != nil {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		glog.Warningf("failed to create functions: %v", err)
+		w.WriteHeader(500)
+		if err := json.NewEncoder(w).Encode(err); err != nil {
+			panic(err)
+		}
+		return
+	} else {
+		rep.Endpoints = ep
+	}
+
+	sendResponse(w, rep)
+}
+
+func DeleteFunction(w http.ResponseWriter, r *http.Request) {
 }
