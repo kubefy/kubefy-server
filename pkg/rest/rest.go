@@ -94,9 +94,9 @@ func GetFunction(w http.ResponseWriter, r *http.Request) {
 	}
 	funcName := req.FunctionName
 	namespace := req.UserName
-	if ep, err := kfunc.View(namespace, funcName); err != nil {
+	if ep, authoriy, err := kfunc.View(namespace, funcName); err != nil {
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		glog.Warningf("failed to create functions: %v", err)
+		glog.Warningf("failed to get function: %v", err)
 		w.WriteHeader(500)
 		if err := json.NewEncoder(w).Encode(err); err != nil {
 			panic(err)
@@ -104,6 +104,7 @@ func GetFunction(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		rep.Endpoints = ep
+		rep.Authority = authoriy
 	}
 
 	sendResponse(w, rep)

@@ -37,10 +37,10 @@ type GetFunctionRequest struct {
 
 type GetFunctionResponse struct {
 	Endpoints []Endpoint `json:"endpoints"`
+	Authority string     `json:"authoriy"`
 }
 
 type Endpoint struct {
-	Endpoint  string `json:"endpoint"`
-	Authority string `json:"authoriy"`
-	Protocol  string `json:"protocol"`
+	Endpoint string `json:"endpoint"`
+	Protocol string `json:"protocol"`
 }

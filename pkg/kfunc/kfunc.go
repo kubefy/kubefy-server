@@ -30,6 +30,7 @@ const (
 	defaultIstioNamespace    = "istio-system"
 	defaultIstioGatewaySvc   = "istio-ingressgateway"
 	defaultBuildTemplate     = "buildah"
+	defaultNumNodeIP         = 3
 )
 
 func Deploy(namespace, gitUrl, gitRevision, containerUrl, containerUser, funcName string) error {
@@ -98,14 +99,23 @@ func Deploy(namespace, gitUrl, gitRevision, containerUrl, containerUser, funcNam
 	return err
 }
 
-func View(namespace, funcName string) ([]model.Endpoint, error) {
+func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 	var (
 		endpoints []model.Endpoint
+		authoriy  string
 	)
 
 	if len(funcName) == 0 {
-		return endpoints, fmt.Errorf("function name is missing")
+		return endpoints, authoriy, fmt.Errorf("function name is missing")
 	}
-	// get istio ingress endpoint
-	return endpoints, nil
+
+	// for nodeport: get istio ingress port and node ip
+	//FIXME use domain if nodeport not configured
+	// get istio ingress nodeport
+
+	// get node ip
+
+	// get service domain
+
+	return endpoints, authoriy, nil
 }
