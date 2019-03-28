@@ -15,6 +15,10 @@ package kfunc
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/golang/glog"
 
 	cfg "github.com/kubefy/kubefy-server/pkg/config"
 	"github.com/kubefy/kubefy-server/pkg/model"
@@ -30,7 +34,7 @@ const (
 	defaultIstioNamespace    = "istio-system"
 	defaultIstioGatewaySvc   = "istio-ingressgateway"
 	defaultBuildTemplate     = "buildah"
-	defaultNumNodeIP         = 3
+	defaultNumNodeAddr       = 3
 )
 
 func Deploy(namespace, gitUrl, gitRevision, containerUrl, containerUser, funcName string) error {
@@ -94,15 +98,16 @@ func Deploy(namespace, gitUrl, gitRevision, containerUrl, containerUser, funcNam
 		},
 	}
 
-	_, err := cfg.ServingClientset.ServingV1alpha1().Services("defaults").Create(svc)
+	_, err := cfg.ServingClientset.ServingV1alpha1().Services(namespace).Create(svc)
 
 	return err
 }
 
 func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 	var (
-		endpoints []model.Endpoint
-		authoriy  string
+		endpoints     []model.Endpoint
+		authoriy      string
+		nodeAddresses []string
 	)
 
 	if len(funcName) == 0 {
@@ -111,10 +116,54 @@ func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 
 	// for nodeport: get istio ingress port and node ip
 	//FIXME use domain if nodeport not configured
-	// get istio ingress nodeport
-
 	// get node ip
+	nodes, err := cfg.KubeClientset.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return endpoints, authoriy, err
+	}
 
+	numNodes := 0
+	for _, n := range nodes.Items {
+		if numNodes >= defaultNumNodeAddr {
+			break
+		}
+
+		st := n.Status
+		if st.Conditions[len(st.Conditions)-1].Type != corev1.NodeReady {
+			glog.Infof("wrong status %v", st.Conditions[len(st.Conditions)].Type)
+			continue
+		}
+		for _, i := range st.Addresses {
+			if i.Type == corev1.NodeExternalIP || i.Type == corev1.NodeHostName {
+				nodeAddresses = append(nodeAddresses, i.Address)
+				numNodes++
+			}
+		}
+	}
+
+	// get istio ingress nodeport
+	svc, err := cfg.KubeClientset.CoreV1().Services(defaultIstioNamespace).Get(defaultIstioGatewaySvc, metav1.GetOptions{})
+	if err != nil {
+		return endpoints, authoriy, err
+	}
+	// construct endpoint
+	for _, p := range svc.Spec.Ports {
+		if strings.ToLower(p.Name) == "http2" || strings.ToLower(p.Name) == "https" {
+			port := strconv.FormatInt(int64(p.NodePort), 10)
+			ep := []string{}
+			for _, addr := range nodeAddresses {
+				if len(addr) != 0 {
+					e := addr + ":" + port
+					ep = append(ep, e)
+				}
+			}
+			endpoints = append(endpoints, model.Endpoint{
+				Endpoint: ep,
+				Protocol: p.Name,
+			})
+		}
+	}
+	glog.Infof("endpoints %v", endpoints)
 	// get service domain
 
 	return endpoints, authoriy, nil

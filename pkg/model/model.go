@@ -41,6 +41,6 @@ type GetFunctionResponse struct {
 }
 
 type Endpoint struct {
-	Endpoint string `json:"endpoint"`
-	Protocol string `json:"protocol"`
+	Endpoint []string `json:"endpoint"`
+	Protocol string   `json:"protocol"`
 }
