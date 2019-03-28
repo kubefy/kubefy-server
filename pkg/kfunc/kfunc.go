@@ -165,6 +165,10 @@ func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 	}
 	glog.Infof("endpoints %v", endpoints)
 	// get service domain
-
+	servingSvc, err := cfg.ServingClientset.ServingV1alpha1().Services(namespace).Get(funcName, metav1.GetOptions{})
+	if err != nil {
+		return endpoints, authoriy, err
+	}
+	authoriy = servingSvc.Status.Domain
 	return endpoints, authoriy, nil
 }
