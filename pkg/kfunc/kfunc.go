@@ -132,23 +132,15 @@ func DeployImg2Svc(namespace, imageUrl, funcName string) error {
 	return err
 }
 
-func View(namespace, funcName string) ([]model.Endpoint, string, error) {
+func getNodeAddresses() ([]string, error) {
 	var (
-		endpoints     []model.Endpoint
-		authoriy      string
 		nodeAddresses []string
 	)
-
-	if len(funcName) == 0 {
-		return endpoints, authoriy, fmt.Errorf("function name is missing")
-	}
-
 	// for nodeport: get istio ingress port and node ip
-	//FIXME use domain if nodeport not configured
 	// get node ip
 	nodes, err := cfg.KubeClientset.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		return endpoints, authoriy, err
+		return nodeAddresses, err
 	}
 
 	numNodes := 0
@@ -169,29 +161,58 @@ func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 			}
 		}
 	}
+	return nodeAddresses, err
+}
 
-	// get istio ingress nodeport
+func View(namespace, funcName string) ([]model.Endpoint, string, error) {
+	var (
+		endpoints []model.Endpoint
+		authoriy  string
+		addresses []string
+	)
+
+	if len(funcName) == 0 {
+		return endpoints, authoriy, fmt.Errorf("function name is missing")
+	}
+
+	// get istio ingress service
 	svc, err := cfg.KubeClientset.CoreV1().Services(defaultIstioNamespace).Get(defaultIstioGatewaySvc, metav1.GetOptions{})
 	if err != nil {
 		return endpoints, authoriy, err
 	}
 	// construct endpoint
+	svcType := svc.Spec.Type
+
+	if svcType == corev1.ServiceTypeNodePort {
+		nodeAddresses, err := getNodeAddresses()
+		if err != nil {
+			return endpoints, authoriy, err
+		}
+		addresses = nodeAddresses
+	}
+	if svcType == corev1.ServiceTypeLoadBalancer {
+		for _, addr := range svc.Status.LoadBalancer.Ingress {
+			addresses = append(addresses, addr.IP)
+		}
+	}
 	for _, p := range svc.Spec.Ports {
 		if strings.ToLower(p.Name) == "http2" || strings.ToLower(p.Name) == "https" {
-			port := strconv.FormatInt(int64(p.NodePort), 10)
 			ep := []string{}
-			for _, addr := range nodeAddresses {
+			port := strconv.FormatInt(int64(p.NodePort), 10)
+			for _, addr := range addresses {
 				if len(addr) != 0 {
 					e := addr + ":" + port
 					ep = append(ep, e)
 				}
 			}
+
 			endpoints = append(endpoints, model.Endpoint{
 				Endpoint: ep,
 				Protocol: p.Name,
 			})
 		}
 	}
+
 	glog.Infof("endpoints %v", endpoints)
 	// get service domain
 	servingSvc, err := cfg.ServingClientset.ServingV1alpha1().Services(namespace).Get(funcName, metav1.GetOptions{})
