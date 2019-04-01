@@ -54,7 +54,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// handle user here
-
+	glog.Infof("created user %v", req.UserName)
 	// response
 	sendResponse(w, rep)
 }
@@ -70,17 +70,32 @@ func CreateFunction(w http.ResponseWriter, r *http.Request) {
 	gitUrl := req.GitRepo
 	gitRevision := req.RepoRevision
 	funcName := req.FunctionName
-	dockerId := req.DockerId
+	image := req.ContainerImage
 	namespace := req.UserName
-	if err := kfunc.Deploy(namespace, gitUrl, gitRevision, "docker.io", dockerId, funcName); err != nil {
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		glog.Warningf("failed to create functions: %v", err)
-		w.WriteHeader(500)
-		if err := json.NewEncoder(w).Encode(err); err != nil {
-			panic(err)
+	if len(gitUrl) > 0 {
+		if err := kfunc.DeploySrc2Svc(namespace, gitUrl, gitRevision, image, funcName); err != nil {
+			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+			glog.Warningf("failed to create functions: %v", err)
+			w.WriteHeader(500)
+			if err := json.NewEncoder(w).Encode(err); err != nil {
+				panic(err)
+			}
+			return
 		}
-		return
+	} else {
+		if len(image) > 0 {
+			if err := kfunc.DeployImg2Svc(namespace, image, funcName); err != nil {
+				w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+				glog.Warningf("failed to create functions: %v", err)
+				w.WriteHeader(500)
+				if err := json.NewEncoder(w).Encode(err); err != nil {
+					panic(err)
+				}
+				return
+			}
+		}
 	}
+	glog.Infof("created function %v", req.FunctionName)
 	sendResponse(w, rep)
 }
 
