@@ -4,7 +4,7 @@ type CreateUserRequest struct {
 	UserName string `json:"userName"`
 	Bucket   string `json:"bucket,omitempty"`
 	// docker setting
-	DockerId       string `json:"dockerId"`
+	DockerId       string `json:"dockerId,omitempty"`
 	DockerPassword string `json:"dockerPassword,omitempty"`
 	// github setting
 	GithubId       string `json:"githubId,omitempty"`
@@ -17,6 +17,7 @@ type CreateUserResponse struct {
 	S3Endpoint  string `json:"s3endpoint,omitempty"`
 	S3AccessKey string `json:"s3access,omitempty"`
 	S3SecretKey string `json:"s3secret,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 type CreateFunctionRequest struct {
@@ -28,6 +29,7 @@ type CreateFunctionRequest struct {
 }
 
 type CreateFunctionResponse struct {
+	Error string `json:"error,omitempty"`
 }
 
 type GetFunctionRequest struct {
@@ -38,6 +40,7 @@ type GetFunctionRequest struct {
 type GetFunctionResponse struct {
 	Endpoints []Endpoint `json:"endpoints"`
 	Authority string     `json:"authoriy"`
+	Error     string     `json:"error,omitempty"`
 }
 
 type Endpoint struct {
