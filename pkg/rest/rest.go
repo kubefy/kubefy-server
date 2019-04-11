@@ -14,6 +14,7 @@ import (
 	"github.com/kubefy/kubefy-server/pkg/kfunc"
 	"github.com/kubefy/kubefy-server/pkg/kube"
 	"github.com/kubefy/kubefy-server/pkg/model"
+	"github.com/kubefy/kubefy-server/pkg/storage"
 )
 
 func getRequest(w http.ResponseWriter, r *http.Request, req interface{}) error {
@@ -125,7 +126,6 @@ func CreateFunction(w http.ResponseWriter, r *http.Request) {
 	namespace := req.UserName
 	if len(gitUrl) > 0 {
 		if err := kfunc.DeploySrc2Svc(namespace, gitUrl, gitRevision, image, funcName); err != nil {
-			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 			rep.Error = err.Error()
 			sendError(w, rep)
 			return
@@ -168,4 +168,28 @@ func GetFunction(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteFunction(w http.ResponseWriter, r *http.Request) {
+}
+
+func CreateStorage(w http.ResponseWriter, r *http.Request) {
+	var (
+		req model.CreateStorageRequest
+		rep model.CreateStorageResponse
+	)
+	if err := getRequest(w, r, &req); err != nil {
+		return
+	}
+
+	userName := req.UserName
+	if bucket, s3id, s3key, endpoint, err := storage.CreateStorage(userName); err != nil {
+		rep.Error = err.Error()
+		sendError(w, rep)
+		return
+	} else {
+		glog.Infof("created bucket %v", bucket)
+		rep.Bucket = bucket
+		rep.S3Endpoint = endpoint
+		rep.S3AccessKey = s3id
+		rep.S3SecretKey = s3key
+	}
+	sendResponse(w, rep)
 }

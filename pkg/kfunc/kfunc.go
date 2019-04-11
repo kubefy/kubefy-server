@@ -22,6 +22,7 @@ import (
 
 	cfg "github.com/kubefy/kubefy-server/pkg/config"
 	"github.com/kubefy/kubefy-server/pkg/model"
+	"github.com/kubefy/kubefy-server/pkg/util"
 
 	build_api "github.com/knative/build/pkg/apis/build/v1alpha1"
 	serving_api "github.com/knative/serving/pkg/apis/serving/v1alpha1"
@@ -132,38 +133,6 @@ func DeployImg2Svc(namespace, imageUrl, funcName string) error {
 	return err
 }
 
-func getNodeAddresses() ([]string, error) {
-	var (
-		nodeAddresses []string
-	)
-	// for nodeport: get istio ingress port and node ip
-	// get node ip
-	nodes, err := cfg.KubeClientset.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return nodeAddresses, err
-	}
-
-	numNodes := 0
-	for _, n := range nodes.Items {
-		if numNodes >= defaultNumNodeAddr {
-			break
-		}
-
-		st := n.Status
-		if st.Conditions[len(st.Conditions)-1].Type != corev1.NodeReady {
-			glog.Infof("wrong status %v", st.Conditions[len(st.Conditions)].Type)
-			continue
-		}
-		for _, i := range st.Addresses {
-			if i.Type == corev1.NodeExternalIP || i.Type == corev1.NodeHostName {
-				nodeAddresses = append(nodeAddresses, i.Address)
-				numNodes++
-			}
-		}
-	}
-	return nodeAddresses, err
-}
-
 func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 	var (
 		endpoints []model.Endpoint
@@ -184,7 +153,7 @@ func View(namespace, funcName string) ([]model.Endpoint, string, error) {
 	svcType := svc.Spec.Type
 
 	if svcType == corev1.ServiceTypeNodePort {
-		nodeAddresses, err := getNodeAddresses()
+		nodeAddresses, err := util.GetNodeAddresses(defaultNumNodeAddr)
 		if err != nil {
 			return endpoints, authoriy, err
 		}

@@ -7,8 +7,10 @@ import (
 )
 
 var (
-	KubeClientset    *kubernetes.Clientset
-	ServingClientset *serving_clientset.Clientset
-	RookClientset    *rook_clientset.Clientset
-	BuildTemplate    string
+	KubeClientset       *kubernetes.Clientset
+	ServingClientset    *serving_clientset.Clientset
+	RookClientset       *rook_clientset.Clientset
+	BuildTemplate       string
+	RookCephCluster     string
+	RookCephObjectStore string
 )

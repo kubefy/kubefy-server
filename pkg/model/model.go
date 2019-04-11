@@ -2,7 +2,6 @@ package model
 
 type CreateUserRequest struct {
 	UserName string `json:"userName"`
-	Bucket   string `json:"bucket,omitempty"`
 	// docker setting
 	DockerId       string `json:"dockerId,omitempty"`
 	DockerPassword string `json:"dockerPassword,omitempty"`
@@ -12,12 +11,8 @@ type CreateUserRequest struct {
 }
 
 type CreateUserResponse struct {
-	UserName    string `json:"userName"`
-	Bucket      string `json:"bucket,omitempty"`
-	S3Endpoint  string `json:"s3endpoint,omitempty"`
-	S3AccessKey string `json:"s3access,omitempty"`
-	S3SecretKey string `json:"s3secret,omitempty"`
-	Error       string `json:"error,omitempty"`
+	UserName string `json:"userName"`
+	Error    string `json:"error,omitempty"`
 }
 
 type CreateFunctionRequest struct {
@@ -46,4 +41,16 @@ type GetFunctionResponse struct {
 type Endpoint struct {
 	Endpoint []string `json:"endpoint"`
 	Protocol string   `json:"protocol"`
+}
+
+type CreateStorageRequest struct {
+	UserName string `json:"userName"`
+}
+
+type CreateStorageResponse struct {
+	Bucket      string     `json:"bucket,omitempty"`
+	S3Endpoint  []Endpoint `json:"s3endpoint,omitempty"`
+	S3AccessKey string     `json:"s3access,omitempty"`
+	S3SecretKey string     `json:"s3secret,omitempty"`
+	Error       string     `json:"error,omitempty"`
 }
