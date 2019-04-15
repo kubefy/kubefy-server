@@ -37,10 +37,6 @@ const (
 )
 
 func CreateStorage(userName string) (bucket string, s3id string, s3key string, endpoints []model.Endpoint, err error) {
-	var (
-		addresses []string
-	)
-
 	user := &rookceph.CephObjectStoreUser{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      userName,
@@ -113,49 +109,67 @@ func CreateStorage(userName string) (bucket string, s3id string, s3key string, e
 	}
 	for _, svc := range svcs.Items {
 		tp := svc.Spec.Type
-		switch tp {
-		case v1.ServiceTypeClusterIP:
-			addresses = append(addresses, svc.Spec.ClusterIP)
-		case v1.ServiceTypeNodePort:
-			nodeAddresses, getErr := util.GetNodeAddresses(defaultNumNodeAddr)
-			if getErr != nil {
-				err = getErr
-				return
-			}
-			addresses = nodeAddresses
+		if tp == v1.ServiceTypeClusterIP {
+			addr := svc.Spec.ClusterIP
+			if len(addr) != 0 {
+				for _, p := range svc.Spec.Ports {
+					if strings.ToLower(p.Name) == "http" || strings.ToLower(p.Name) == "https" {
+						ep := []string{}
 
-		case v1.ServiceTypeLoadBalancer:
-			for _, addr := range svc.Status.LoadBalancer.Ingress {
-				addresses = append(addresses, addr.IP)
-			}
-
-		}
-		for _, p := range svc.Spec.Ports {
-			if strings.ToLower(p.Name) == "http" || strings.ToLower(p.Name) == "https" {
-				ep := []string{}
-
-				port := p.Port
-				if tp != v1.ServiceTypeClusterIP {
-					port = p.NodePort
-				}
-				port64 := strconv.FormatInt(int64(port), 10)
-				for _, addr := range addresses {
-					if len(addr) != 0 {
+						port := p.Port
+						port64 := strconv.FormatInt(int64(port), 10)
 						e := addr + ":" + port64
 						ep = append(ep, e)
+
+						endpoints = append(endpoints, model.Endpoint{
+							Endpoint: ep,
+							Protocol: p.Name,
+						})
 					}
 				}
+			}
+		} else {
+			var (
+				addresses []string
+			)
+			if tp == v1.ServiceTypeNodePort {
+				nodeAddresses, getErr := util.GetNodeAddresses(defaultNumNodeAddr)
+				if getErr != nil {
+					err = getErr
+					return
+				}
+				addresses = append(addresses, nodeAddresses...)
+			}
+			if tp == v1.ServiceTypeLoadBalancer {
+				for _, addr := range svc.Status.LoadBalancer.Ingress {
+					addresses = append(addresses, addr.IP)
+				}
+			}
+			if len(addresses) == 0 {
+				continue
+			}
+			for _, p := range svc.Spec.Ports {
+				//FIXME: what if the protocol is other than http/https?
+				if strings.ToLower(p.Name) == "http" || strings.ToLower(p.Name) == "https" {
+					ep := []string{}
+					port := strconv.FormatInt(int64(p.NodePort), 10)
+					for _, addr := range addresses {
+						if len(addr) != 0 {
+							e := addr + ":" + port
+							ep = append(ep, e)
+						}
+					}
 
-				endpoints = append(endpoints, model.Endpoint{
-					Endpoint: ep,
-					Protocol: p.Name,
-				})
+					endpoints = append(endpoints, model.Endpoint{
+						Endpoint: ep,
+						Protocol: p.Name,
+					})
+				}
 			}
 		}
-
 	}
 	if len(endpoints) == 0 {
-		err = fmt.Errorf("no cluster ip")
+		err = fmt.Errorf("no valid endpoint")
 		glog.Infof("%v", err)
 		return
 	}
